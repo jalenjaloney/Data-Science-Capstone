@@ -1,0 +1,19 @@
+[project]
+name = "forward-food-capstone"
+version = "0.1.0"
+description = "Pomona College Dining Forward Food Pledge: plant-based protein share"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas",
+    "openpyxl",
+    "matplotlib",
+    "numpy",
+    # Quarto executes Python chunks through a Jupyter kernel (no notebooks).
+    "ipykernel",
+    "nbformat",
+    "nbclient",
+    "pyyaml",
+]
+
+[tool.uv]
+package = false

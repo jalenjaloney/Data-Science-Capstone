@@ -1,0 +1,17 @@
+# Vendor purchase data
+data/
+outputs/*.csv
+
+# Local environment / OS / Python clutter
+.venv/
+__pycache__/
+.DS_Store
+
+# Quarto render output and freeze cache (both embed purchase data and pricing)
+.quarto/
+_freeze/
+report/*.html
+report/*_files/
+
+/.quarto/
+**/*.quarto_ipynb
