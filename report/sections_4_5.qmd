@@ -1,0 +1,130 @@
+---
+title: "Defining/Classifying Protein, Measuring Progress"
+subtitle: "Pomona College Dining: Forward Food Pledge"
+format:
+  html:
+    toc: true
+    embed-resources: true
+jupyter: python3
+execute:
+  echo: true
+  warning: false
+  freeze: auto
+---
+
+FY26 Sysco purchases
+
+## Setup
+
+```{python}
+from pathlib import Path
+import sys
+
+import numpy as np
+import pandas as pd
+
+ROOT = next(
+    p for p in [Path.cwd(), *Path.cwd().parents] if (p / "src").is_dir()
+)
+sys.path.insert(0, str(ROOT / "src"))
+
+from loaders import sysco_fy26, fy26_vendor_tabs
+from protein_classifier import classify_frame
+from summaries import vendor_scope, class_crosstab, items
+
+DATA = ROOT / "data" / "raw" / "FY26"
+WORKBOOK = DATA / "Food_2026_final.xlsx"
+RAW_SYSCO = DATA / "Vendor Data" / "Sysco_FY26.xlsx"
+
+pd.set_option("display.width", 200)
+pd.set_option("display.max_columns", 30)
+pd.set_option("display.max_rows", 200)
+pd.set_option("display.float_format", "{:,.2f}".format)
+```
+
+## Load the Sysco tab
+
+Standard table; drops header and zero-dollar rows.
+
+```{python}
+sysco = sysco_fy26.load(WORKBOOK)
+pd.Series(sysco.attrs["cleaning_log"], name="rows").to_frame()
+```
+
+```{python}
+print(f"Lines: {len(sysco):,}  "
+      f"Dollars: ${sysco['usd'].sum():,.2f}  "
+      f"Pounds: {sysco['weight_lb'].sum():,.0f}")
+sysco.head()
+```
+
+## Reconcile with the raw Sysco export
+
+Per-hall totals vs. Sysco's account totals.
+
+```{python}
+raw_totals = sysco_fy26.load_raw_totals(RAW_SYSCO)
+recon = sysco_fy26.reconcile(sysco, raw_totals)
+located = recon.drop(index=["(no hall)", "TOTAL"])
+assert (located["usd_diff"].abs() < 0.005).all()
+recon
+```
+
+## Scope
+
+```{python}
+others = fy26_vendor_tabs.load(WORKBOOK)
+scope = vendor_scope(pd.concat([sysco, others]))
+
+def k(vendor, col="usd"):
+    return f"${scope.loc[vendor, col] / 1e3:,.0f}k"
+
+
+s = {
+    "sysco": f"{scope.loc['Sysco', 'share']:.0%}",
+    "kikka": k("Kikka"),
+    "newport": k("Newport Meat Company"),
+    "fishking": k("Fish King Inc."),
+    "wismettac": k("Wismettac Asian Foods", "Red Meat"),
+    "natures": k("Nature's Produce", "Dairy/Eggs"),
+}
+scope[scope[["Red Meat", "Poultry", "Seafood", "Dairy/Eggs"]].sum(axis=1) > 0]
+```
+
+Sysco is `{python} s["sysco"]` of FY26 food-vendor spend. Other vendors with
+protein: Kikka (`{python} s["kikka"]`, coded Seafood), Newport Meat
+(`{python} s["newport"]`), Fish King (`{python} s["fishking"]`), Wismettac
+(`{python} s["wismettac"]` Red Meat) and Nature's Produce
+(`{python} s["natures"]` Dairy/Eggs). Their protein is mostly animal, so the
+Sysco share is likely an upper bound on Pomona's overall share.
+
+## Classify protein (draft rules)
+
+Ordered regex rules on (description, category); first match wins.
+
+```{python}
+cls = classify_frame(sysco)
+assert len(cls) == len(sysco)
+```
+
+### Category × class, dollars
+
+```{python}
+class_crosstab(cls).round(0)
+```
+
+### Lines and dollars per rule
+
+```{python}
+cls.groupby("rule")["usd"].agg(lines="size", usd="sum").round(0)
+```
+
+### Borderline items
+
+```{python}
+borderline = (
+    cls["desc"].str.contains(r"COCONUT|CHEESE CREAM|CREAM CHEESE", na=False)
+    | cls["protein_class"].isin(["mixed_animal", "mixed_plant"])
+)
+items(cls, borderline).round(0)
+```
