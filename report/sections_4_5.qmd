@@ -9,8 +9,11 @@ jupyter: python3
 execute:
   echo: true
   warning: false
-  freeze: auto
 ---
+
+## Introduction
+
+TODO: introduction.
 
 FY26 Sysco purchases
 
@@ -30,7 +33,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from loaders import sysco_fy26, fy26_vendor_tabs
 from protein_classifier import classify_frame
-from summaries import vendor_scope, class_crosstab, items
+from summaries import vendor_scope, class_crosstab, items, plant_share
 
 DATA = ROOT / "data" / "raw" / "FY26"
 WORKBOOK = DATA / "Food_2026_final.xlsx"
@@ -107,6 +110,21 @@ cls = classify_frame(sysco)
 assert len(cls) == len(sysco)
 ```
 
+### Plant share by definition
+
+A: flesh vs analog + legume/soy; B: + egg vs + nut/seed; C: + dairy vs +
+plant dairy alt; D: + mixed animal vs + mixed plant.
+
+```{python}
+shares = plant_share(cls)
+shares.assign(
+    plant_usd=shares["plant_usd"].map("${:,.0f}".format),
+    animal_usd=shares["animal_usd"].map("${:,.0f}".format),
+    plant_share_usd=shares["plant_share_usd"].map("{:.1%}".format),
+    plant_share_lb=shares["plant_share_lb"].map("{:.1%}".format),
+)
+```
+
 ### Category × class, dollars
 
 ```{python}
@@ -128,3 +146,7 @@ borderline = (
 )
 items(cls, borderline).round(0)
 ```
+
+## Status and next steps
+
+TODO: status and next steps.
